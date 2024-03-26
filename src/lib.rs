@@ -1,66 +1,11 @@
 //! A model for protecting non-reentrant/TLS data structures using a static
 //! version of [`ghost cells`](https://docs.rs/ghost-cell).
 //!
-//! # Problem
+//! # Usage
 //!
-//! Non-reentrant/TLS data structures are common in Rust, but they are pretty
-//! tricky to be handled by the aliasing XOR mutability borrow rules because of
-//! their static lifetime and visibility to unscoped code contexts. For example:
-//!
-//! ```compile_fail
-//! thread_local! {
-//!     // We want to mutate the this variable using the `mut` keyword,
-//!     // but the macro prevents us to do that because `static mut`s are evil.
-//!     static mut MY_DATA: String = String::new();
-//! }
-//! ```
-//!
-//! In order to make the above code compile, the TLS variable usually end up
-//! being wrapped in a [`Cell`] or a [`RefCell`](core::cell::RefCell), which
-//! either requires the wrapped data to implement [`Copy`], or adds runtime cost
-//! for borrow checking (per variable), which seems not ideal.
-//!
-//! # Adoption
-//!
-//! ## Ghost cells
-//!
-//! Ghost cells separates the borrow rules from the data storage itself, while
-//! preserving the zero-runtime-cost & safe borrow checks. An example adopted
-//! from [its official documentation](https://docs.rs/ghost-cell) is shown below:
-//!
-//! ```rust
-//! use ghost_cell::{GhostToken, GhostCell};
-//!
-//! let n = 42;
-//!
-//! let value = GhostToken::new(|mut token| {
-//!     let cell = GhostCell::new(42);
-//!
-//!     let vec: Vec<_> = (0..n).map(|_| &cell).collect();
-//!
-//!     *vec[n / 2].borrow_mut(&mut token) = 33;
-//!
-//!     *cell.borrow(&token)
-//! });
-//!
-//! assert_eq!(33, value);
-//! ```
-//!
-//! In the example above, a ghost token creates a scope, where all the ghost
-//! cells bound to the scope can borrow their data arbitrarily by tagging the
-//! ghost token.
-//!
-//! ## Modification
-//!
-//! Aside from its benefits of zero-runtime-cost & safe borrow checks, the
-//! creation of ghost tokens are again tricky to be performed, because ghost
-//! tokens cannot be created with the `'static` lifetime.
-//!
-//! Thus, the scoped creation is substituted with a
-//! [`RefCell`-like approach](State) which guarantees the uniqueness
-//! of tokens per execution unit. Although the runtime cost of borrow checking
-//! cannot be avoided, it can be significantly reduced by adapting to a larger
-//! scope:
+//! For the simplest use cases, wrapping thread-local variables with
+//! [`LocalCell`]s, and accessing them via [`with`] and [`with_mut`] will
+//! suffice:
 //!
 //! ```rust
 //! #![feature(lazy_cell)]
@@ -99,10 +44,10 @@
 //! }
 //! ```
 //!
-//! ## Reentracy, Again
+//! # Customize the reentrancy controller
 //!
 //! The example above is not very connected to the concept of reentrancy, but
-//! here we add another [trait](Reentrancy) to actually tackles this problem.
+//! here we add another [trait](Reentrancy) to actually tackle this problem.
 //!
 //! The `Reentrancy` trait controls the low-level reentrancy state of the
 //! current execution unit, such as disabling/enabling interrupts in a CPU core,
@@ -137,13 +82,6 @@
 //! [`reentrant::with`](with), or add a `Token` reference argument to the
 //! locking function in order to bound the lifetime of the lock guard to the
 //! token.
-//!
-//! # Caveats
-//!
-//! The non-reentrant token is unique per execution unit, which means that
-//! [`with_mut`] cannot be nested, while adding `token: &(mut)
-//! reentrant::Token` to the argument list of functions may decrease the
-//! readability of codes.
 #![no_std]
 #![deny(future_incompatible)]
 #![deny(rust_2018_idioms)]
