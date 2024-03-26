@@ -91,7 +91,7 @@
 #![feature(allow_internal_unsafe)]
 #![feature(thread_local)]
 
-mod cell;
+pub mod cell;
 mod global;
 pub mod state;
 
