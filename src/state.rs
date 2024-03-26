@@ -44,13 +44,15 @@ pub struct Token(PhantomData<*mut ()>);
 #[derive(Debug, Clone, Copy)]
 pub enum BorrowState {
     /// The current token is borrowed immutably, from which only shared
-    /// references of values from [`LocalCell`]s can be created.
+    /// references of values from [`LocalCell`](crate::LocalCell)s can be
+    /// created.
     BorrowedRef {
         /// The number of immutable borrows.
         num_borrows: usize,
     },
     /// The current token is borrowed mutably, from which both shared &
-    /// exclusive references of values from [`LocalCell`]s can be created.
+    /// exclusive references of values from [`LocalCell`](crate::LocalCell)s can
+    /// be created.
     BorrowedMut,
     /// The current token is not borrowed, which indicates that the current
     /// execution unit is reentrant.

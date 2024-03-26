@@ -326,12 +326,12 @@ pub trait BorrowExt<'a>: private::Sealed {
     type Output: 'a;
 
     /// Borrows a collection of `LocalCell`s.
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```rust
     /// use reentrant::{LocalCell, cell::BorrowExt};
-    /// 
+    ///
     /// let array = LocalCell::new([1, 2, 3, 4, 5]);
     /// let each_ref = array.as_array().each_ref();
     /// reentrant::with(|token| {
