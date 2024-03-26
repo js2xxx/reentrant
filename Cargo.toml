@@ -1,0 +1,15 @@
+[package]
+edition = "2021"
+name = "reentrant"
+version = "0.1.0"
+
+[features]
+debug = []
+default = ["tls"]
+global = []
+tls = ["global"]
+
+[dependencies]
+
+[dev-dependencies]
+ghost-cell = "0.2"
