@@ -10,6 +10,7 @@ use core::{
     fmt,
     marker::PhantomData,
     ops::{Deref, DerefMut},
+    sync::atomic::{self, Ordering::*},
 };
 
 use crate::Global;
@@ -114,6 +115,7 @@ impl<T: Reentrancy + ?Sized> State<T> {
             if state == 0 {
                 self.last_location.set(Some(Location::caller()));
             }
+            atomic::compiler_fence(Acquire);
             Ok(TokenRef { state: self })
         } else {
             Err(BorrowError {
@@ -140,6 +142,8 @@ impl<T: Reentrancy + ?Sized> State<T> {
             self.inner.set(-1);
             #[cfg(feature = "debug")]
             self.last_location.set(Some(Location::caller()));
+
+            atomic::compiler_fence(Acquire);
             Ok(TokenMut {
                 state: self,
                 token: Token(PhantomData),
@@ -302,6 +306,8 @@ impl<T: Reentrancy> DerefMut for TokenMut<'_, T> {
 
 impl<T: Reentrancy + ?Sized> Drop for TokenRef<'_, T> {
     fn drop(&mut self) {
+        atomic::compiler_fence(Release);
+
         let state = self.state.inner.get() - 1;
         self.state.inner.set(state);
         if state == 0 {
@@ -313,6 +319,8 @@ impl<T: Reentrancy + ?Sized> Drop for TokenRef<'_, T> {
 
 impl<T: Reentrancy + ?Sized> Drop for TokenMut<'_, T> {
     fn drop(&mut self) {
+        atomic::compiler_fence(Release);
+
         let state = self.state.inner.get() + 1;
         assert!(state == 0);
         self.state.inner.set(0);
