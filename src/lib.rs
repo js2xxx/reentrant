@@ -56,7 +56,7 @@
 //! own with the default feature disabled:
 //!
 //! ```rust,ignore
-//! use reentrant::{Reentrancy, reentrancy_impl};
+//! use reentrant::{Reentrancy, reentrancy_impl, reentrant_handler};
 //! use x86_64::instructions::interrupts;
 //!
 //! struct X86Interrupts;
@@ -75,6 +75,13 @@
 //!         interrupts::are_enabled()
 //!     }
 //! }
+//!
+//! /// This function will be called right after
+//! /// the current execution unit becomes reentrant.
+//! fn handler() {
+//!     // preempt_schedule();
+//! }
+//! reentrant_handler!(handler);
 //! ```
 //!
 //! Besides, for spin locks that require non-reentrancy (in the Linux kernel for
