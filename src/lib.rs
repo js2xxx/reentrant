@@ -96,6 +96,8 @@
 #![warn(missing_docs)]
 #![allow(internal_features)]
 #![feature(allow_internal_unsafe)]
+#![feature(array_windows)]
+#![feature(strict_provenance)]
 #![feature(thread_local)]
 
 pub mod cell;

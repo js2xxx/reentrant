@@ -1,13 +1,13 @@
 use super::*;
 
-/// A shorthand trait for a collection of `LocalCell`s.
+/// A shorthand trait for immutably borrowing a collection of `LocalCell`s.
 ///
 /// This trait cannot be implemented by users.
 pub trait BorrowExt<'a>: private::Sealed {
     /// The output for borrowed references.
     type Output: 'a;
 
-    /// Borrows a collection of `LocalCell`s.
+    /// Immutably borrows a collection of `LocalCell`s.
     ///
     /// # Examples
     ///
@@ -58,3 +58,28 @@ impl<'a, T, const N: usize> BorrowExt<'a> for [&'a LocalCell<T>; N] {
         self.map(|cell| cell.borrow(token))
     }
 }
+
+macro_rules! impl_borrow {
+    ($($t:ident,)*) => {
+        impl<'a, $($t,)*> private::Sealed for &'a ($(LocalCell<$t>,)*) {}
+        impl<'a, $($t,)*> BorrowExt<'a> for &'a ($(LocalCell<$t>,)*) {
+            type Output = &'a ($($t,)*);
+
+            fn borrow(self, token: &'a Token) -> Self::Output {
+                LocalCell::from_tuple(self).borrow(token)
+            }
+        }
+
+        impl<'a, $($t,)*> private::Sealed for ($(&'a LocalCell<$t>,)*) {}
+        impl<'a, $($t,)*> BorrowExt<'a> for ($(&'a LocalCell<$t>,)*) {
+            type Output = ($(&'a $t,)*);
+
+            #[allow(non_snake_case)]
+            fn borrow(self, token: &'a Token) -> Self::Output {
+                let ($($t,)*) = self;
+                ($($t.borrow(token),)*)
+            }
+        }
+    };
+}
+impl_tuples!(impl_borrow);

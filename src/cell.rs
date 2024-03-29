@@ -1,10 +1,22 @@
 //! The module for [`LocalCell`].
 
+macro_rules! impl_tuples {
+    ($macro:ident: ) => {};
+    ($macro:ident: $head:ident $(,$tail:ident)* $(,)?) => {
+        $macro!($head, $($tail,)*);
+        impl_tuples!($macro: $($tail,)*);
+    };
+    ($macro:ident) => {
+        impl_tuples!($macro: A, B, C, D, E, F, G, H, I, J, K, L);
+    };
+}
+
 mod borrow;
+mod borrow_mut;
 
 use core::{cell::UnsafeCell, mem, ptr};
 
-pub use self::borrow::BorrowExt;
+pub use self::{borrow::BorrowExt, borrow_mut::BorrowMutExt};
 use crate::Token;
 
 /// A wrapper for a possibly non-reentrant data.
@@ -332,8 +344,8 @@ pub trait TupleExt {
     fn from_tuple(tuple: &Self::Tuple) -> &Self;
 }
 
-macro_rules! impl_tuples {
-    (@IMPL $($t:ident,)*) => {
+macro_rules! impl_tuples_ext {
+    ($($t:ident,)*) => {
         impl<$($t,)*> TupleExt for LocalCell<($($t,)*)> {
             type Tuple = ($(LocalCell<$t>,)*);
 
@@ -351,35 +363,9 @@ macro_rules! impl_tuples {
                 unsafe { &*(ptr::from_ref(tuple).cast::<Self>()) }
             }
         }
-
-        impl<'a, $($t,)*> private::Sealed for &'a ($(LocalCell<$t>,)*) {}
-        impl<'a, $($t,)*> BorrowExt<'a> for &'a ($(LocalCell<$t>,)*) {
-            type Output = &'a ($($t,)*);
-
-            fn borrow(self, token: &'a Token) -> Self::Output {
-                LocalCell::from_tuple(self).borrow(token)
-            }
-        }
-
-        impl<'a, $($t,)*> private::Sealed for ($(&'a LocalCell<$t>,)*) {}
-        impl<'a, $($t,)*> BorrowExt<'a> for ($(&'a LocalCell<$t>,)*) {
-            type Output = ($(&'a $t,)*);
-
-            #[allow(non_snake_case)]
-            fn borrow(self, token: &'a Token) -> Self::Output {
-                let ($($t,)*) = self;
-                ($($t.borrow(token),)*)
-            }
-        }
     };
-    () => {};
-    ($head:ident $(,$tail:ident)* $(,)?) => {
-        impl_tuples!(@IMPL $head, $($tail,)*);
-        impl_tuples!($($tail,)*);
-    }
 }
-
-impl_tuples!(A, B, C, D, E, F, G, H, I, J, K, L);
+impl_tuples!(impl_tuples_ext);
 
 mod private {
     #[doc(hidden)]
