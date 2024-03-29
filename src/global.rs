@@ -12,6 +12,8 @@ extern "Rust" {
     fn __rust_enable_reentrancy();
 
     fn __rust_is_reentrant() -> bool;
+
+    fn __rust_reentrant_handler();
 }
 
 #[cfg(feature = "global")]
@@ -27,6 +29,11 @@ unsafe impl Reentrancy for Global {
     fn is_reentrant(&self) -> bool {
         unsafe { __rust_is_reentrant() }
     }
+}
+
+#[cfg(feature = "global")]
+fn default_reentrant_handler() {
+    unsafe { __rust_reentrant_handler() }
 }
 
 /// Set up the global reentrancy controller.
@@ -57,15 +64,31 @@ macro_rules! reentrancy_impl {
     };
 }
 
+/// Set up the global reentrant handler.
+///
+/// This handler will be called when the global reentrancy is enabled.
+#[cfg(feature = "global")]
+#[macro_export]
+macro_rules! reentrant_handler {
+    ($e:expr) => {
+        #[no_mangle]
+        extern "Rust" fn __rust_reentrant_handler() {
+            $e();
+        }
+    };
+}
+
 #[cfg(feature = "tls")]
 mod tls {
+    use super::default_reentrant_handler;
     use crate::{
         state::{BorrowError, BorrowMutError},
         Global, State, Token,
     };
 
     #[thread_local]
-    static REENTRANCY_STATE: State<Global> = unsafe { State::new(Global) };
+    static REENTRANCY_STATE: State<Global> =
+        unsafe { State::new(Global, default_reentrant_handler) };
 
     /// Tries to obtain a immutable reference to the non-reentrant token of the
     /// current execution unit, and use it within the function if successfully
@@ -134,4 +157,6 @@ mod default {
             false
         }
     }
+
+    reentrant_handler!(|| {});
 }

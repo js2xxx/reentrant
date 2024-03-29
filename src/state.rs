@@ -62,11 +62,22 @@ pub enum BorrowState {
 
 /// A [`RefCell`](core::cell::RefCell)-like structure which provides borrowing
 /// to the [non-reentrant token](Token)s.
-pub struct State<T: Reentrancy + ?Sized = Global> {
+///
+/// # Reentrant handlers
+///
+/// A reentrant handler is called right after the current execution unit becomes
+/// reentrant.
+///
+/// While both the reentrant handler and the `enable` function are called at the
+/// same time and seem to be of the same usage, the reentrant handler is
+/// designed to trigger some application-level events instead of doing the
+/// actual enabling implementation.
+pub struct State<T: Reentrancy + ?Sized = Global, F: Fn() = fn()> {
     inner: Cell<isize>,
     #[cfg(feature = "debug")]
     last_location: Cell<Option<&'static Location<'static>>>,
     marker: PhantomData<*mut ()>,
+    reentrant_handler: F,
     controller: T,
 }
 
@@ -78,24 +89,25 @@ impl<T: Reentrancy> fmt::Debug for State<T> {
     }
 }
 
-impl<T: Reentrancy> State<T> {
+impl<T: Reentrancy, F: Fn()> State<T, F> {
     /// Creates a new [`State<T>`].
     ///
     /// # Safety
     ///
     /// This structure must be unique per execution unit.
-    pub const unsafe fn new(controller: T) -> Self {
+    pub const unsafe fn new(controller: T, reentrant_handler: F) -> Self {
         State {
             inner: Cell::new(0),
             #[cfg(feature = "debug")]
             last_location: Cell::new(None),
-            controller,
             marker: PhantomData,
+            reentrant_handler,
+            controller,
         }
     }
 }
 
-impl<T: Reentrancy + ?Sized> State<T> {
+impl<T: Reentrancy + ?Sized, F: Fn()> State<T, F> {
     /// Immutably borrows the non-reentrant token of the current execution unit,
     /// returning an error if the token is currently mutably borrowed.
     ///
@@ -106,7 +118,7 @@ impl<T: Reentrancy + ?Sized> State<T> {
     /// shares the same sematics as [the one in
     /// `RefCell`](core::cell::RefCell::try_borrow).
     #[track_caller]
-    pub fn try_borrow(&self) -> Result<TokenRef<'_, T>, BorrowError> {
+    pub fn try_borrow(&self) -> Result<TokenRef<'_, T, F>, BorrowError> {
         self.controller.disable();
         let state = self.inner.get();
         if state >= 0 {
@@ -135,7 +147,7 @@ impl<T: Reentrancy + ?Sized> State<T> {
     /// which shares the same sematics as [the one in
     /// `RefCell`](core::cell::RefCell::try_borrow_mut).
     #[track_caller]
-    pub fn try_borrow_mut(&self) -> Result<TokenMut<'_, T>, BorrowMutError> {
+    pub fn try_borrow_mut(&self) -> Result<TokenMut<'_, T, F>, BorrowMutError> {
         self.controller.disable();
         let state = self.inner.get();
         if state == 0 {
@@ -169,7 +181,7 @@ impl<T: Reentrancy + ?Sized> State<T> {
     /// Panics if the value is currently mutably borrowed. For a non-panicking
     /// variant, use [`try_borrow`](Self::try_borrow).
     #[track_caller]
-    pub fn borrow(&self) -> TokenRef<'_, T> {
+    pub fn borrow(&self) -> TokenRef<'_, T, F> {
         self.try_borrow()
             .unwrap_or_else(|err| panic!("already mutably borrowed: {err:?}"))
     }
@@ -187,7 +199,7 @@ impl<T: Reentrancy + ?Sized> State<T> {
     /// Panics if the value is currently borrowed. For a non-panicking variant,
     /// use [`try_borrow_mut`](Self::try_borrow_mut).
     #[track_caller]
-    pub fn borrow_mut(&self) -> TokenMut<'_, T> {
+    pub fn borrow_mut(&self) -> TokenMut<'_, T, F> {
         self.try_borrow_mut()
             .unwrap_or_else(|err| panic!("already borrowed: {err:?}"))
     }
@@ -270,15 +282,15 @@ impl<T: Reentrancy + ?Sized> State<T> {
 /// A guard to a immutable reference of the current non-reentrant token.
 ///
 /// See [`borrow`](State::borrow) for more information.
-pub struct TokenRef<'a, T: Reentrancy + ?Sized = Global> {
-    state: &'a State<T>,
+pub struct TokenRef<'a, T: Reentrancy + ?Sized = Global, F: Fn() = fn()> {
+    state: &'a State<T, F>,
 }
 
 /// A guard to a mutable reference of the current non-reentrant token.
 ///
 /// See [`borrow_mut`](State::borrow_mut) for more information.
-pub struct TokenMut<'a, T: Reentrancy + ?Sized = Global> {
-    state: &'a State<T>,
+pub struct TokenMut<'a, T: Reentrancy + ?Sized = Global, F: Fn() = fn()> {
+    state: &'a State<T, F>,
     token: Token,
 }
 
@@ -304,7 +316,7 @@ impl<T: Reentrancy> DerefMut for TokenMut<'_, T> {
     }
 }
 
-impl<T: Reentrancy + ?Sized> Drop for TokenRef<'_, T> {
+impl<T: Reentrancy + ?Sized, F: Fn()> Drop for TokenRef<'_, T, F> {
     fn drop(&mut self) {
         atomic::compiler_fence(Release);
 
@@ -312,12 +324,13 @@ impl<T: Reentrancy + ?Sized> Drop for TokenRef<'_, T> {
         self.state.inner.set(state);
         if state == 0 {
             // SAFETY: There is no other borrowing of the non-reentrant token.
-            unsafe { self.state.controller.enable() }
+            unsafe { self.state.controller.enable() };
+            (self.state.reentrant_handler)()
         }
     }
 }
 
-impl<T: Reentrancy + ?Sized> Drop for TokenMut<'_, T> {
+impl<T: Reentrancy + ?Sized, F: Fn()> Drop for TokenMut<'_, T, F> {
     fn drop(&mut self) {
         atomic::compiler_fence(Release);
 
@@ -325,6 +338,7 @@ impl<T: Reentrancy + ?Sized> Drop for TokenMut<'_, T> {
         assert!(state == 0);
         self.state.inner.set(0);
         // SAFETY: There is no other borrowing of the non-reentrant token.
-        unsafe { self.state.controller.enable() }
+        unsafe { self.state.controller.enable() };
+        (self.state.reentrant_handler)()
     }
 }
