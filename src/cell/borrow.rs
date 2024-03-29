@@ -50,8 +50,8 @@ impl<'a, T, const N: usize> BorrowExt<'a> for &'a [LocalCell<T>; N] {
     }
 }
 
-impl<'a, T, const N: usize> private::Sealed for [&'a LocalCell<T>; N] {}
-impl<'a, T, const N: usize> BorrowExt<'a> for [&'a LocalCell<T>; N] {
+impl<'a, T: ?Sized, const N: usize> private::Sealed for [&'a LocalCell<T>; N] {}
+impl<'a, T: ?Sized, const N: usize> BorrowExt<'a> for [&'a LocalCell<T>; N] {
     type Output = [&'a T; N];
 
     fn borrow(self, token: &'a Token) -> Self::Output {
@@ -70,8 +70,8 @@ macro_rules! impl_borrow {
             }
         }
 
-        impl<'a, $($t,)*> private::Sealed for ($(&'a LocalCell<$t>,)*) {}
-        impl<'a, $($t,)*> BorrowExt<'a> for ($(&'a LocalCell<$t>,)*) {
+        impl<'a, $($t: ?Sized,)*> private::Sealed for ($(&'a LocalCell<$t>,)*) {}
+        impl<'a, $($t: ?Sized,)*> BorrowExt<'a> for ($(&'a LocalCell<$t>,)*) {
             type Output = ($(&'a $t,)*);
 
             #[allow(non_snake_case)]

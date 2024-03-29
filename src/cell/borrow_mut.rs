@@ -12,8 +12,10 @@ use super::*;
 ///
 /// Due to the inability of aliasing checks on different instances of ZSTs,
 /// whose pointer addresses are all the same dangling yet well-aligned value,
-/// all ZSTs are treated as they are different instances. Hence, arrays/tuples
-/// which contain more than 1 ZST fail on the aliasing checks.
+/// all ZSTs are treated as they are different instances.
+///
+/// As such, arrays/tuples which contain references to more than 1 ZST of the
+/// same type will always fail on the aliasing checks.
 pub trait BorrowMutExt<'a>: private::Sealed + Sized {
     /// The output for borrowed references.
     type Output: 'a;
@@ -147,7 +149,7 @@ impl<'a, T, const N: usize> BorrowMutExt<'a> for &'a [LocalCell<T>; N] {
     }
 }
 
-impl<'a, T, const N: usize> BorrowMutExt<'a> for [&'a LocalCell<T>; N] {
+impl<'a, T: ?Sized, const N: usize> BorrowMutExt<'a> for [&'a LocalCell<T>; N] {
     type Output = [&'a mut T; N];
 
     fn try_borrow_mut(self, token: &'a mut Token) -> Result<Self::Output, AliasedError> {
@@ -172,7 +174,7 @@ macro_rules! impl_borrow_mut {
             }
         }
 
-        impl<'a, $($t,)*> BorrowMutExt<'a> for ($(&'a LocalCell<$t>,)*) {
+        impl<'a, $($t: ?Sized,)*> BorrowMutExt<'a> for ($(&'a LocalCell<$t>,)*) {
             type Output = ($(&'a mut $t,)*);
 
             #[allow(non_snake_case)]

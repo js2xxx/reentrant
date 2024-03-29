@@ -16,7 +16,10 @@ mod borrow_mut;
 
 use core::{cell::UnsafeCell, mem, ptr};
 
-pub use self::{borrow::BorrowExt, borrow_mut::BorrowMutExt};
+pub use self::{
+    borrow::BorrowExt,
+    borrow_mut::{AliasedError, BorrowMutExt},
+};
 use crate::Token;
 
 /// A wrapper for a possibly non-reentrant data.
@@ -25,6 +28,9 @@ use crate::Token;
 /// - Shared access to the cell requires access through the associated
 ///   [non-reentrant token](Token) which will enforce at compile-time the
 ///   aliasing XOR mutability safety property.
+///
+/// Unlike ghost cells, this wrapper is not `Sync`, since `Token`s from
+/// different threads cannot be distinguished.
 #[repr(transparent)]
 pub struct LocalCell<T: ?Sized>(UnsafeCell<T>);
 
@@ -123,7 +129,6 @@ impl<T: ?Sized> LocalCell<T> {
     }
 }
 
-#[forbid(unsafe_code)]
 impl<T> LocalCell<T> {
     /// Replaces the wrapped value with a new one, returning the old one.
     ///
@@ -187,8 +192,49 @@ impl<T> LocalCell<T> {
     pub fn set<'a>(&'a self, src: T, token: &'a mut Token) {
         *self.borrow_mut(token) = src;
     }
+}
 
-    /// Transfroms a `LocalCell` of a tuple into a tuple of `LocalCell`s by
+impl<T> LocalCell<T> {
+    /// Swaps the wrapped value with another `LocalCell`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the two `LocalCell`s are aliased.
+    pub fn swap<'a>(&'a self, other: &'a Self, token: &'a mut Token) {
+        let (a, b) = (self, other).borrow_mut(token);
+        mem::swap(a, b);
+    }
+
+    /// Tries to swap the wrapped value with another `LocalCell`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the two `LocalCell`s are aliased.
+    pub fn try_swap<'a>(
+        &'a self,
+        other: &'a Self,
+        token: &'a mut Token,
+    ) -> Result<(), AliasedError> {
+        let (a, b) = (self, other).try_borrow_mut(token)?;
+        mem::swap(a, b);
+        Ok(())
+    }
+
+    /// Swaps the wrapped value with another `LocalCell`, without alias
+    /// checking.
+    ///
+    /// # Safety
+    ///
+    /// Undefined behavior will occur if the two `LocalCell`s are aliased.
+    pub unsafe fn swap_unchecked<'a>(&'a self, other: &'a Self, token: &'a mut Token) {
+        // SAFETY: The two `LocalCells` are not aliased by contract.
+        let (a, b) = unsafe { (self, other).borrow_mut_unchecked(token) };
+        mem::swap(a, b);
+    }
+}
+
+impl<T> LocalCell<T> {
+    /// Transforms a `LocalCell` of a tuple into a tuple of `LocalCell`s by
     /// reference.
     ///
     /// # Examples
@@ -214,7 +260,7 @@ impl<T> LocalCell<T> {
         TupleExt::as_tuple(self)
     }
 
-    /// Transfroms a `LocalCell` of a tuple into a tuple of `LocalCell`s.
+    /// Transforms a `LocalCell` of a tuple into a tuple of `LocalCell`s.
     pub fn into_tuple(self) -> <Self as TupleExt>::Tuple
     where
         Self: TupleExt,
@@ -222,7 +268,7 @@ impl<T> LocalCell<T> {
         TupleExt::into_tuple(self)
     }
 
-    /// Transfroms a tuple of `LocalCell`s into a `LocalCell` of a tuple.
+    /// Transforms a tuple of `LocalCell`s into a `LocalCell` of a tuple.
     ///
     /// Note that due to the lack of support for partial tuple binding patterns
     /// (`let (a, b @ ..) = tuple`), the split operation is not available for
