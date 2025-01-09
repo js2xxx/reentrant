@@ -1,6 +1,6 @@
 [package]
 authors = ["Js2xxx <akucxy@163.com>"]
-edition = "2021"
+edition = "2024"
 homepage = "https://github.com/Js2xxx/reentrant"
 license = "MIT OR Apache-2.0"
 name = "reentrant"

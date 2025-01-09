@@ -23,7 +23,7 @@ pub trait BorrowExt<'a>: private::Sealed {
     fn borrow(self, token: &'a Token) -> Self::Output;
 }
 
-impl<'a, T: ?Sized> private::Sealed for &'a LocalCell<T> {}
+impl<T: ?Sized> private::Sealed for &LocalCell<T> {}
 impl<'a, T: ?Sized> BorrowExt<'a> for &'a LocalCell<T> {
     type Output = &'a T;
 
@@ -32,7 +32,7 @@ impl<'a, T: ?Sized> BorrowExt<'a> for &'a LocalCell<T> {
     }
 }
 
-impl<'a, T> private::Sealed for &'a [LocalCell<T>] {}
+impl<T> private::Sealed for &[LocalCell<T>] {}
 impl<'a, T> BorrowExt<'a> for &'a [LocalCell<T>] {
     type Output = &'a [T];
 
@@ -41,7 +41,7 @@ impl<'a, T> BorrowExt<'a> for &'a [LocalCell<T>] {
     }
 }
 
-impl<'a, T, const N: usize> private::Sealed for &'a [LocalCell<T>; N] {}
+impl<T, const N: usize> private::Sealed for &[LocalCell<T>; N] {}
 impl<'a, T, const N: usize> BorrowExt<'a> for &'a [LocalCell<T>; N] {
     type Output = &'a [T; N];
 
@@ -50,7 +50,7 @@ impl<'a, T, const N: usize> BorrowExt<'a> for &'a [LocalCell<T>; N] {
     }
 }
 
-impl<'a, T: ?Sized, const N: usize> private::Sealed for [&'a LocalCell<T>; N] {}
+impl<T: ?Sized, const N: usize> private::Sealed for [&LocalCell<T>; N] {}
 impl<'a, T: ?Sized, const N: usize> BorrowExt<'a> for [&'a LocalCell<T>; N] {
     type Output = [&'a T; N];
 

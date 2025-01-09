@@ -306,7 +306,7 @@ impl<T: Reentrancy> Deref for TokenMut<'_, T> {
     type Target = Token;
 
     fn deref(&self) -> &Self::Target {
-        &Token(PhantomData)
+        &self.token
     }
 }
 

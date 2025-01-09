@@ -6,14 +6,14 @@
 pub struct Global;
 
 #[cfg(feature = "global")]
-extern "Rust" {
-    fn __rust_disable_reentrancy();
+unsafe extern "Rust" {
+    unsafe fn __rust_disable_reentrancy();
 
-    fn __rust_enable_reentrancy();
+    unsafe fn __rust_enable_reentrancy();
 
-    fn __rust_is_reentrant() -> bool;
+    unsafe fn __rust_is_reentrant() -> bool;
 
-    fn __rust_reentrant_handler();
+    unsafe fn __rust_reentrant_handler();
 }
 
 #[cfg(feature = "global")]
@@ -47,17 +47,17 @@ fn default_reentrant_handler() {
 #[allow_internal_unsafe]
 macro_rules! reentrancy_impl {
     ($e:expr) => {
-        #[no_mangle]
+        #[unsafe(no_mangle)]
         extern "Rust" fn __rust_disable_reentrancy() {
             $crate::Reentrancy::disable(&$e);
         }
 
-        #[no_mangle]
+        #[unsafe(no_mangle)]
         unsafe extern "Rust" fn __rust_enable_reentrancy() {
             unsafe { $crate::Reentrancy::enable(&$e) };
         }
 
-        #[no_mangle]
+        #[unsafe(no_mangle)]
         extern "Rust" fn __rust_is_reentrant() -> bool {
             $crate::Reentrancy::is_reentrant(&$e)
         }
@@ -69,9 +69,10 @@ macro_rules! reentrancy_impl {
 /// This handler will be called when the global reentrancy is enabled.
 #[cfg(feature = "global")]
 #[macro_export]
+#[allow_internal_unsafe]
 macro_rules! reentrant_handler {
     ($e:expr) => {
-        #[no_mangle]
+        #[unsafe(no_mangle)]
         extern "Rust" fn __rust_reentrant_handler() {
             $e();
         }
@@ -82,8 +83,8 @@ macro_rules! reentrant_handler {
 mod tls {
     use super::default_reentrant_handler;
     use crate::{
-        state::{BorrowError, BorrowMutError},
         Global, State, Token,
+        state::{BorrowError, BorrowMutError},
     };
 
     #[thread_local]
