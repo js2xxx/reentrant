@@ -21,14 +21,18 @@ use crate::Global;
 /// # Safety
 ///
 /// The implementation of this trait must ensure that the reentrancy state is
-/// not corrupted.
+/// not corrupted:
+/// 
+/// - The `disable()` method must be idempotent. That is to say, if the
+///   reentrancy is already disabled, calling `disable()` again must have no
+///   effect.
 pub unsafe trait Reentrancy {
     /// Enables reentrancy for the current execution unit.
     ///
     /// # Safety
     ///
     /// The caller must ensure that no data which requires the reentrancy to be
-    /// disabled are live in the current scope.
+    /// disabled are alive in the current scope.
     unsafe fn enable(&self);
 
     /// Disables reentrancy for the current execution unit.

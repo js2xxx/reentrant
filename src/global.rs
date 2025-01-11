@@ -88,7 +88,7 @@ mod tls {
     };
 
     #[thread_local]
-    static REENTRANCY_STATE: State<Global> =
+    static REENTRANCY_STATE: State =
         unsafe { State::new(Global, default_reentrant_handler) };
 
     /// Tries to obtain a immutable reference to the non-reentrant token of the
