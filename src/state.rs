@@ -98,7 +98,7 @@ impl<T: Reentrancy, F: Fn()> State<T, F> {
     ///
     /// # Safety
     ///
-    /// This structure must be unique per execution unit.
+    /// This structure must be unique per execution unit/control flow.
     pub const unsafe fn new(controller: T, reentrant_handler: F) -> Self {
         State {
             inner: Cell::new(0),
@@ -298,7 +298,7 @@ pub struct TokenMut<'a, T: Reentrancy + ?Sized = Global, F: Fn() = fn()> {
     token: Token,
 }
 
-impl<T: Reentrancy> Deref for TokenRef<'_, T> {
+impl<T: Reentrancy + ?Sized, F: Fn()> Deref for TokenRef<'_, T, F> {
     type Target = Token;
 
     fn deref(&self) -> &Self::Target {
@@ -306,7 +306,7 @@ impl<T: Reentrancy> Deref for TokenRef<'_, T> {
     }
 }
 
-impl<T: Reentrancy> Deref for TokenMut<'_, T> {
+impl<T: Reentrancy + ?Sized, F: Fn()> Deref for TokenMut<'_, T, F> {
     type Target = Token;
 
     fn deref(&self) -> &Self::Target {
@@ -314,7 +314,7 @@ impl<T: Reentrancy> Deref for TokenMut<'_, T> {
     }
 }
 
-impl<T: Reentrancy> DerefMut for TokenMut<'_, T> {
+impl<T: Reentrancy + ?Sized, F: Fn()> DerefMut for TokenMut<'_, T, F> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.token
     }

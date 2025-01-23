@@ -97,7 +97,6 @@
 #![allow(internal_features)]
 #![feature(allow_internal_unsafe)]
 #![feature(array_windows)]
-#![feature(strict_provenance)]
 #![feature(thread_local)]
 
 pub mod cell;
@@ -109,6 +108,6 @@ extern crate std;
 
 pub use self::{
     cell::LocalCell,
-    global::{try_with, try_with_mut, with, with_mut, Global},
+    global::*,
     state::{Reentrancy, State, Token},
 };

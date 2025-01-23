@@ -91,7 +91,13 @@ mod tls {
     static REENTRANCY_STATE: State =
         unsafe { State::new(Global, default_reentrant_handler) };
 
-    /// Tries to obtain a immutable reference to the non-reentrant token of the
+    /// Tries to access the reentrancy state of the current execution unit
+    /// within a function.
+    pub fn with_state<T>(f: impl FnOnce(&State) -> T) -> T {
+        f(&REENTRANCY_STATE)
+    }
+
+    /// Tries to obtain an immutable reference to the non-reentrant token of the
     /// current execution unit, and use it within the function if successfully
     /// obtained.
     ///
@@ -140,7 +146,7 @@ mod tls {
     }
 }
 #[cfg(feature = "tls")]
-pub use self::tls::{try_with, try_with_mut, with, with_mut};
+pub use self::tls::{try_with, try_with_mut, with, with_mut, with_state};
 use crate::Reentrancy;
 
 #[cfg(feature = "default")]
